@@ -1,0 +1,108 @@
+#!/usr/bin/env python2
+# -*- coding: utf-8 -*-
+"""
+
+
+
+
+
+"""
+
+
+import matplotlib as mp
+import numpy as np
+import TCModel as tcm
+import collections 
+
+
+# Default parameters
+#M,P,G = tcm.DefaultParams()
+M,P,G = tcm.NewParams()
+
+# Initiate, Call, Integrate, Weight & Calculate spectral response:
+Y,w = tcm.RunIntRespond(M,P,G)
+
+
+# Load real data prepped in matlab
+File = '/Users/Alex/Desktop/stuuuuff/ModelData.mat'
+Real,w = tcm.LoadDCM(File)
+
+# Plot starting point
+# from matplotlib import pyplot as plt
+# plt.plot(w,Real,w,Y)
+
+
+# Make a master dictionary:
+PG = collections.OrderedDict()
+PG["P"] = P
+PG["G"] = G
+V = tcm.DictToArr(PG) # full model, (reversibly) vectorised
+
+# check objective function is callable
+e = tcm.ObjectiveFun(V,PG,M,File)
+
+# optimisation
+#-----------------------------------------------------------------------------
+
+from scipy.optimize import minimize
+
+#res = minimize(tcm.ObjectiveFun, V, args=(PG,M,File), method='nelder-mead',options={'xtol': 1e-8, 'disp': True})
+
+res = minimize(tcm.ObjectiveFun, V, args=(PG,M,File), method='Powell',options={'xtol': 1e-8, 'disp': True})
+
+
+# reshape outputs
+X1,z = tcm.ArrToDict(res.x,PG)
+
+P0 = X1['P']
+G0 = X1['G']
+
+# compute current prediction
+y0,f0 = tcm.Integrator(P0,M,1,G0)
+X0 = tcm.Observer(y0,G0)
+YY = tcm.SpectralResponse(X0,M,M['w'])
+
+#plt.plot(w,Real,w,YY)
+
+
+
+
+
+
+# notes on vecorising / unvectorising functions:
+#--------------------------------------------------
+# import TCModel as tcm
+# V = tcm.DictToArr(M)   # put dictionary values from M into 1d numpt array,V
+# N = tcm.ArrToDict(V,M) # put numpy array V into dictionary M in new dict N
+
+
+
+
+
+
+## Independent steps of RunIntRespond:
+##--------------------------------------------------
+#
+## Complete model coniguration
+#M = tcm.InitM(M)
+#
+## make model states starting point
+#x = M['x'].copy()
+# 
+## check neural model is callable
+#dx = tcm.fx(x,1,P,M)
+#
+## call integration scheme
+#y0,f0 = tcm.Integrator(P,M,1,G)
+#
+## weighted signal
+#X0 = tcm.Observer(y0,G)
+#
+## frequencies to return
+#w = np.linspace(4, 100, num=97, endpoint=True) # freqs of interest
+#
+#YY = tcm.SpectralResponse(X0,M,w)
+#
+## plt.plot(w,YY)
+
+
