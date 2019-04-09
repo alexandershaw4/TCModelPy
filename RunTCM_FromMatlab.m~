@@ -1,0 +1,67 @@
+function [X,BestCost] = RunTCM_FromMatlab(Y0)
+% Set up and run TCModel in python, from matlab.
+%
+% Matlab has better optimisers
+%
+% AS
+global YY M tcm
+YY = Y0;
+
+% tcm [& conda] in MATLAB
+% pyversion /Users/Alex/anaconda/bin/python
+
+% PyBP location
+modpath = '/Users/Alex/code/TCModelPy';
+P       = py.sys.path;
+if count(P,modpath) == 0
+    insert(P,int32(0),modpath);
+end
+
+
+% Import the TCM tools
+tcm = py.importlib.import_module('TCModel');
+
+% Set up a new model
+M   = tcm.NewParams();
+
+P  = M{2};
+G  = M{3};
+M0 = M{1};
+
+% Run it (simulate)
+Y  = tcm.RunIntRespond(M0,P,G);
+Y  = double(Y{1});
+
+% reversibly convert parameter struct(dict) to array
+pE  = tcm.DictToArr(P);
+pEv = pE.double;
+
+% fit the model using abc
+[X,BestCost] = atcm.optim.abcAS(@Obj,pE,(~~pE)/16);
+
+
+end
+
+
+function e = Obj(P)
+global YY M tcm
+
+P0 = tcm.ArrToDict(P,M{2});
+Y  = tcm.RunIntRespond(M{1},P0,M{3});
+e  = spm_vec(Y) - spm_vec(YY);
+
+plot(spm_vec(YY),'b','linewidth',2); hold on;
+plot(spm_vec(Y) ,'r-','linewidth',2); hold off;
+drawnow;
+
+end
+
+
+% % Rearrange returned data to matlab double
+% data = double(py.array.array('d',py.numpy.nditer(infl))); 
+% shp  = infl.shape;
+% shp  = shp.cell; 
+% data = reshape(data,[shp{2} shp{1}])'; 
+% 
+% imesh = mesh;
+% imesh.vertices = data;
